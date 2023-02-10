@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: node-express
-        image: ghcr.io/${IMAGE_NAME}:master
+        image: ${IMAGE_NAME}:${IMAGE_TAG}
         imagePullPolicy: Always
         resources:
           requests:
@@ -27,3 +27,5 @@ spec:
             cpu: "200m"
         ports:
         - containerPort: 80
+      imagePullSecrets:
+        - name: quant-cloud
