@@ -1,4 +1,4 @@
-{{- if eq .Values.productionBranch .Values.images.app.branch }}
+{{- if eq .Values.productionBranch .Values.images.app.tag }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
