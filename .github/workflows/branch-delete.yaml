@@ -3,13 +3,9 @@ name: Delete environment
 on:
   delete:
     branches:
-      - master
+      - main
       - develop
       - 'feature/*'
-
-concurrency:
-  group: ${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   delete-environment:
