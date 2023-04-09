@@ -13,6 +13,8 @@ app.get('/', async function(req, res) {
   const info = await response.text();
   const locationInfo = JSON.parse(info);
 
+  console.log(locationInfo);
+
   res.render(__dirname + '/views/pages/index', locationInfo);
 });
 

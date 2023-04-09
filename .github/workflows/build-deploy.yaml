@@ -1,0 +1,87 @@
+name: Deploy to Quant Cloud
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+      - 'feature/*'
+
+env:
+  REGISTRY: ${{ secrets.CONTAINER_REGISTRY_URL }}
+  IMAGE_NAME: ${{ secrets.CONTAINER_REGISTRY_URL }}/${{ secrets.CONTAINER_REGISTRY_PROJECT_PREFIX }}/${{ secrets.QUANT_PROJECT_ID }}
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      -
+        name: Create friendly branch name
+        run: |
+          BRANCH_NAME=`echo $BRANCH_NAME | tr "[:upper:]" "[:lower:]" | sed -e 's/\//-/g'`
+          echo $BRANCH_NAME
+          echo "BRANCH_NAME_CLEAN=$(echo $BRANCH_NAME)" >> $GITHUB_ENV
+
+      - name: Setup kubeconfig
+        env:
+          SECTION_K8S_API_URL: "${{ secrets.SECTION_K8S_API_URL }}"
+          SECTION_API_TOKEN: "${{ secrets.SECTION_API_TOKEN }}"
+        run: |
+          ./ci/init-kube.sh
+          echo 'KUBECONFIG<<EOF' >> $GITHUB_ENV
+          echo $(cat ~/.kube/config | base64) >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.CONTAINER_REGISTRY_URL }}
+          username: ${{ secrets.CONTAINER_REGISTRY_USER }}
+          password: ${{ secrets.CONTAINER_REGISTRY_TOKEN }}
+
+      - name: Use buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push Docker image to Quant Cloud
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.BRANCH_NAME_CLEAN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to Quant Cloud
+        uses: koslib/helm-eks-action@v1.28.0
+        env:
+          KUBE_CONFIG_DATA: ${{ env.KUBECONFIG }}
+        with:
+          command: |
+            helm upgrade --install ${{ env.BRANCH_NAME_CLEAN }} \
+              charts/node-express \
+              --set appVersion="${{ github.sha }}" \
+              --set images.app.repository="${{ env.IMAGE_NAME }}" \
+              --set images.app.tag="${{ env.BRANCH_NAME_CLEAN }}" \
+              --set images.app.branch="${{ env.BRANCH_NAME_CLEAN }}" \
+              --set secrets.registry.user='${{ secrets.CONTAINER_REGISTRY_USER }}' \
+              --set secrets.registry.token='${{ secrets.CONTAINER_REGISTRY_TOKEN }}'
+
+      - name: Clear the QuantCDN caches
+        uses: quantcdn/purge-action@v1.2.0
+        with:
+          customer: ${{ secrets.QUANT_CUSTOMER_ID }}
+          project: ${{ secrets.QUANT_PROJECT_ID }}
+          token: ${{ secrets.QUANT_TOKEN }}
+          url_pattern: "/*"
