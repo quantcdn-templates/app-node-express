@@ -5,7 +5,7 @@ replicaCount: 1
 
 nameOverride: ""
 fullnameOverride: ""
-productionBranch: master
+productionBranch: main
 
 images:
   pullPolicy: Always
