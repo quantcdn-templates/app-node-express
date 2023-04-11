@@ -69,8 +69,10 @@ jobs:
           KUBE_CONFIG_DATA: ${{ env.KUBECONFIG }}
         with:
           command: |
+            helm repo add quantcdn https://quantcdn.github.io/helm-charts/
             helm upgrade --install ${{ env.BRANCH_NAME_CLEAN }} \
-              charts/node-express \
+              quantcdn/node-express \
+              --version 0.2.0 \
               --set appVersion="${{ github.sha }}" \
               --set images.app.repository="${{ env.IMAGE_NAME }}" \
               --set images.app.tag="${{ env.BRANCH_NAME_CLEAN }}" \
