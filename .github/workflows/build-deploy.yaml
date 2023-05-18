@@ -23,26 +23,27 @@ jobs:
       contents: read
       packages: write
 
+    environment:
+      name: Quant Cloud (${{ github.head_ref || github.ref_name }})
+      url: ${{ steps.setup-branch-names.outputs.ENVIRONMENT_URL }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
       -
         name: Create friendly branch name
+        id: setup-branch-names
         run: |
-          BRANCH_NAME=`echo $BRANCH_NAME | tr "[:upper:]" "[:lower:]" | sed "s/[^[:alnum:]-]/-/g"`
+          BRANCH_NAME=`echo ${BRANCH_NAME##*/} | tr "[:upper:]" "[:lower:]" | sed "s/[^[:alnum:]]//g"`
           echo $BRANCH_NAME
           echo "BRANCH_NAME_CLEAN=$(echo $BRANCH_NAME)" >> $GITHUB_ENV
+          echo "ENVIRONMENT_URL=http://node-$BRANCH_NAME.`echo ${{ secrets.QUANT_PROJECT_UUID }} | base64 -d`.apps.quant.cloud" >> $GITHUB_OUTPUT
 
-      - name: Setup kubeconfig
+      - uses: quantcdn/cloud-init-action@v1.0.0
         env:
           SECTION_K8S_API_URL: "${{ secrets.SECTION_K8S_API_URL }}"
           SECTION_API_TOKEN: "${{ secrets.SECTION_API_TOKEN }}"
-        run: |
-          ./ci/init-kube.sh
-          echo 'KUBECONFIG<<EOF' >> $GITHUB_ENV
-          echo $(cat ~/.kube/config | base64) >> $GITHUB_ENV
-          echo 'EOF' >> $GITHUB_ENV
 
       - name: Log in to the Container registry
         uses: docker/login-action@v2
@@ -69,9 +70,11 @@ jobs:
           KUBE_CONFIG_DATA: ${{ env.KUBECONFIG }}
         with:
           command: |
-            helm upgrade --install ${{ env.BRANCH_NAME_CLEAN }} \
-              charts/node-express \
+            helm repo add quantcdn https://quantcdn.github.io/helm-charts/
+            helm upgrade --install ${{ env.BRANCH_NAME_CLEAN }} quantcdn/node \
+              --version 0.3.0 \
               --set appVersion="${{ github.sha }}" \
+              --set appEnvironment="${{ env.BRANCH_NAME_CLEAN }}" \
               --set images.app.repository="${{ env.IMAGE_NAME }}" \
               --set images.app.tag="${{ env.BRANCH_NAME_CLEAN }}" \
               --set secrets.registry.user='${{ secrets.CONTAINER_REGISTRY_USER }}' \
