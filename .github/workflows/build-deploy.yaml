@@ -72,7 +72,7 @@ jobs:
           command: |
             helm repo add quantcdn https://quantcdn.github.io/helm-charts/
             helm upgrade --install ${{ env.BRANCH_NAME_CLEAN }} quantcdn/node \
-              --version 0.3.0 \
+              --version 0.3.1 \
               --set appVersion="${{ github.sha }}" \
               --set appEnvironment="${{ env.BRANCH_NAME_CLEAN }}" \
               --set images.app.repository="${{ env.IMAGE_NAME }}" \
